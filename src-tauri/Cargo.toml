@@ -1,6 +1,6 @@
 [package]
 name = "querydeck"
-version = "0.1.2"
+version = "0.1.1"
 description = "A fast, lightweight Microsoft SQL Server (MSSQL) desktop client — a slim alternative to SSMS / Azure Data Studio."
 authors = ["Zilu Ramkrishna Rane <zilurrane@gmail.com>"]
 license = "MIT"

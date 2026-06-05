@@ -1,7 +1,7 @@
 {
   "name": "querydeck",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.1",
   "description": "A fast, lightweight Microsoft SQL Server (MSSQL) desktop client — a slim, modern alternative to SSMS and Azure Data Studio. Built with Tauri, React, and the tiberius Rust driver.",
   "keywords": [
     "sql-server",
