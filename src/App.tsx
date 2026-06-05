@@ -61,7 +61,7 @@ export default function App() {
     <div className="app">
       <header data-tauri-drag-region>
         <div className="logo">
-          <span className="mark">Q</span> QueryDeck
+          <img className="mark" src="/icon.png" alt="" /> QueryDeck
         </div>
         <ConnSwitcher />
         <div className="spacer" data-tauri-drag-region />
@@ -90,7 +90,7 @@ export default function App() {
 
           {!conn ? (
             <div className="welcome">
-              <div className="wmark">Q</div>
+              <img className="wmark" src="/icon.png" alt="" />
               <h1>Welcome to QueryDeck</h1>
               <p>A fast, focused SQL Server studio. Connect to a database to browse its schema, write T-SQL, and explore your data.</p>
               <div className="wbtn" onClick={() => setModalOpen(true)}>🔌 New connection</div>
