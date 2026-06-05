@@ -1,8 +1,9 @@
 # QueryDeck
 
-A fast, focused **Microsoft SQL Server (MSSQL)** desktop client — a slim, modern
-alternative to SSMS / Azure Data Studio. Browse your schema, write T-SQL, explore
-and edit your data, all in a lightweight native app.
+**QueryDeck is a fast, lightweight Microsoft SQL Server (MSSQL) desktop client** — a
+slim, modern alternative to SQL Server Management Studio (SSMS) and Azure Data Studio.
+Browse your schema, write T-SQL, and explore and edit your data, all in a lightweight
+native app.
 
 Built with **Tauri 2 + React + TypeScript** and a small Rust core using
 [`tiberius`](https://github.com/prisma/tiberius) for SQL Server connectivity.
@@ -134,6 +135,40 @@ SQL Server types.
 
 ---
 
+## FAQ
+
+**What is QueryDeck?**
+QueryDeck is a fast, lightweight desktop client for Microsoft SQL Server (MSSQL). It
+lets you connect to a SQL Server instance, browse its schema, write and run T-SQL, and
+view and edit results — in a small native app built with Tauri, React, and the Rust
+`tiberius` driver.
+
+**Is QueryDeck free?**
+Yes. QueryDeck is free and open source under the [MIT license](LICENSE).
+
+**How is QueryDeck different from SSMS or Azure Data Studio?**
+It's intentionally slim and focused: a ~10 MB installer that starts instantly and uses
+the OS WebView (no bundled Chromium). It covers the everyday loop — connect, browse,
+query, edit, export — without the weight of the larger tools.
+
+**Which databases does QueryDeck support?**
+Microsoft SQL Server only (including Azure SQL and SQL Server in Docker), via the
+`tiberius` driver. It is not a general-purpose multi-database client.
+
+**Which platforms does it run on?**
+Windows-first, with builds for macOS and Linux. Passwords are stored in the OS keychain
+(Windows Credential Manager on Windows).
+
+**Does QueryDeck work offline?**
+Yes. It talks only to the SQL Server you connect to — there are no required cloud or
+telemetry services. The app updates itself from GitHub Releases when you choose to.
+
+**Does QueryDeck use AI?**
+Not in the shipped app. A plain-English-to-SQL "Ask" feature is on the roadmap as an
+optional, opt-in capability (see [docs/VISION.md](docs/VISION.md)).
+
+---
+
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © Zilu Ramkrishna Rane

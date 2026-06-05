@@ -2,6 +2,29 @@
   "name": "querydeck",
   "private": true,
   "version": "0.1.1",
+  "description": "A fast, lightweight Microsoft SQL Server (MSSQL) desktop client — a slim, modern alternative to SSMS and Azure Data Studio. Built with Tauri, React, and the tiberius Rust driver.",
+  "keywords": [
+    "sql-server",
+    "mssql",
+    "sql-client",
+    "database-client",
+    "tsql",
+    "ssms-alternative",
+    "azure-data-studio-alternative",
+    "tauri",
+    "tiberius",
+    "sql-editor"
+  ],
+  "homepage": "https://github.com/zilurrane/QueryDeck#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zilurrane/QueryDeck.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zilurrane/QueryDeck/issues"
+  },
+  "author": "Zilu Ramkrishna Rane <zilurrane@gmail.com>",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

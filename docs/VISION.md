@@ -4,10 +4,6 @@ A fast, focused **Microsoft SQL Server (MSSQL)** desktop client — a slim,
 modern alternative to SSMS / Azure Data Studio. Built with **Tauri + React +
 TypeScript** on Windows, with a small Rust core using the **`tiberius`** driver.
 
-> Interactive mock of the full vision: [`../querydeck-mock.html`](../querydeck-mock.html)
-> (open in a browser — toggle Studio / Welcome / Command palette / Light theme
-> via the switcher in the bottom-right).
-
 ---
 
 ## Product Principles
@@ -69,7 +65,7 @@ Everything here is achievable with Tauri + `tiberius` and ships first.
 | Layer | Choice |
 |---|---|
 | Shell | Tauri 2.x (Windows WebView2) |
-| Frontend | Vite + React 18 + TypeScript |
+| Frontend | Vite + React 19 + TypeScript |
 | UI | Tailwind CSS + shadcn/ui |
 | SQL editor | CodeMirror 6 (`@codemirror/lang-sql`, T-SQL) |
 | Results grid | TanStack Table v8 |
@@ -78,9 +74,6 @@ Everything here is achievable with Tauri + `tiberius` and ships first.
 | TLS | `rustls` |
 | Secrets | `keyring` (Windows Credential Manager) |
 | Settings | `tauri-plugin-store` |
-
-Full implementation plan (architecture, files, verification):
-`C:\Users\ZiluRane\.claude\plans\i-want-to-create-humble-puddle.md`
 
 ---
 
@@ -95,6 +88,5 @@ Full implementation plan (architecture, files, verification):
 ## Status
 - [x] Product direction chosen: MSSQL-only desktop client
 - [x] Tech stack selected (Tauri + React + `tiberius`)
-- [x] UI mock of full vision ([`querydeck-mock.html`](../querydeck-mock.html))
-- [ ] Scaffold project
-- [ ] MVP implementation
+- [x] Scaffold project
+- [x] MVP + Phase 1 implementation (see [ROADMAP.md](ROADMAP.md))
