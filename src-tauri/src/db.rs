@@ -21,7 +21,8 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
 use sqlx::mysql::{MySqlConnectOptions, MySqlConnection, MySqlSslMode};
 use sqlx::postgres::{PgConnectOptions, PgConnection, PgSslMode};
-use sqlx::{Column as _, ConnectOptions, Row as _, TypeInfo as _};
+use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection};
+use sqlx::{Column as _, ConnectOptions, Row as _, TypeInfo as _, ValueRef as _};
 
 type SqlClient = Client<Compat<TcpStream>>;
 
@@ -34,6 +35,7 @@ pub enum Engine {
     Mssql,
     Postgres,
     Mysql,
+    Sqlite,
 }
 
 impl Default for Engine {
@@ -47,6 +49,7 @@ enum AnyConn {
     Mssql(SqlClient),
     Postgres(PgConnection),
     Mysql(MySqlConnection),
+    Sqlite(SqliteConnection),
 }
 
 struct Conn {
@@ -111,6 +114,7 @@ async fn build_client(cfg: &ConnConfig) -> Result<AnyConn, String> {
         Engine::Mssql => Ok(AnyConn::Mssql(build_mssql(cfg).await?)),
         Engine::Postgres => Ok(AnyConn::Postgres(build_postgres(cfg).await?)),
         Engine::Mysql => Ok(AnyConn::Mysql(build_mysql(cfg).await?)),
+        Engine::Sqlite => Ok(AnyConn::Sqlite(build_sqlite(cfg).await?)),
     }
 }
 
@@ -171,6 +175,18 @@ async fn build_mysql(cfg: &ConnConfig) -> Result<MySqlConnection, String> {
     opts.connect().await.map_err(err)
 }
 
+async fn build_sqlite(cfg: &ConnConfig) -> Result<SqliteConnection, String> {
+    // SQLite is file-based: the path lives in `database` (host/port/auth unused).
+    if cfg.database.trim().is_empty() {
+        return Err("SQLite requires a database file path".to_string());
+    }
+    SqliteConnectOptions::new()
+        .filename(&cfg.database)
+        .connect()
+        .await
+        .map_err(err)
+}
+
 // ---------------------------------------------------------------------------
 // Execution (dispatches per engine, normalises to QueryResult)
 // ---------------------------------------------------------------------------
@@ -181,6 +197,7 @@ async fn exec(conn: &mut AnyConn, sql: &str, cap: Option<usize>) -> Result<Query
         AnyConn::Mssql(c) => exec_mssql(c, sql, cap, start).await,
         AnyConn::Postgres(c) => exec_postgres(c, sql, cap, start).await,
         AnyConn::Mysql(c) => exec_mysql(c, sql, cap, start).await,
+        AnyConn::Sqlite(c) => exec_sqlite(c, sql, cap, start).await,
     }
 }
 
@@ -300,6 +317,44 @@ async fn exec_mysql(
         let mut vals = Vec::with_capacity(columns.len());
         for i in 0..columns.len() {
             vals.push(mysql_cell_to_json(row, i));
+        }
+        rows.push(vals);
+    }
+
+    Ok(finish(columns, rows, start))
+}
+
+async fn exec_sqlite(
+    conn: &mut SqliteConnection,
+    sql: &str,
+    cap: Option<usize>,
+    start: Instant,
+) -> Result<QueryResult, String> {
+    let raw = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .fetch_all(&mut *conn)
+        .await
+        .map_err(err)?;
+
+    let mut columns: Vec<Column> = Vec::new();
+    let mut rows: Vec<Vec<Value>> = Vec::new();
+
+    for row in &raw {
+        if columns.is_empty() {
+            columns = row
+                .columns()
+                .iter()
+                .map(|c| Column {
+                    name: c.name().to_string(),
+                    type_name: c.type_info().name().to_lowercase(),
+                })
+                .collect();
+        }
+        if cap.is_some_and(|n| rows.len() >= n) {
+            break;
+        }
+        let mut vals = Vec::with_capacity(columns.len());
+        for i in 0..columns.len() {
+            vals.push(sqlite_cell_to_json(row, i));
         }
         rows.push(vals);
     }
@@ -510,6 +565,35 @@ fn mysql_cell_to_json(row: &sqlx::mysql::MySqlRow, idx: usize) -> Value {
 }
 
 // ---------------------------------------------------------------------------
+// SQLite value mapping (dynamic typing — branch on the value's storage class)
+// ---------------------------------------------------------------------------
+
+fn sqlite_cell_to_json(row: &sqlx::sqlite::SqliteRow, idx: usize) -> Value {
+    let raw = match row.try_get_raw(idx) {
+        Ok(r) => r,
+        Err(_) => return Value::Null,
+    };
+    if raw.is_null() {
+        return Value::Null;
+    }
+    // SQLite storage classes: INTEGER, REAL, TEXT, BLOB.
+    match raw.type_info().name().to_uppercase().as_str() {
+        "INTEGER" => row.try_get::<i64, usize>(idx).ok().map(Value::from).unwrap_or(Value::Null),
+        "REAL" => row.try_get::<f64, usize>(idx).ok().map(Value::from).unwrap_or(Value::Null),
+        "BLOB" => row
+            .try_get::<Vec<u8>, usize>(idx)
+            .ok()
+            .map(|b| {
+                let hex: String = b.iter().map(|x| format!("{:02x}", x)).collect();
+                Value::String(format!("0x{}", hex))
+            })
+            .unwrap_or(Value::Null),
+        // TEXT and anything else -> string
+        _ => row.try_get::<String, usize>(idx).ok().map(Value::String).unwrap_or(Value::Null),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Schema introspection (per engine, aliased to the same column names)
 // ---------------------------------------------------------------------------
 
@@ -542,6 +626,16 @@ fn schema_sql(engine: Engine) -> &'static str {
               ON c.table_schema = t.table_schema AND c.table_name = t.table_name \
             WHERE t.table_schema = DATABASE() \
             ORDER BY t.table_schema, t.table_name, c.ordinal_position",
+        Engine::Sqlite => "\
+            SELECT 'main' AS \"TABLE_SCHEMA\", m.name AS \"TABLE_NAME\", \
+                   UPPER(m.type) AS \"TABLE_TYPE\", p.name AS \"COLUMN_NAME\", \
+                   p.type AS \"DATA_TYPE\", \
+                   CASE WHEN p.\"notnull\" = 0 THEN 'YES' ELSE 'NO' END AS \"IS_NULLABLE\", \
+                   p.cid + 1 AS \"ORDINAL_POSITION\" \
+            FROM sqlite_master m \
+            JOIN pragma_table_info(m.name) p \
+            WHERE m.type IN ('table', 'view') AND m.name NOT LIKE 'sqlite_%' \
+            ORDER BY m.name, p.cid",
     }
 }
 
@@ -797,5 +891,49 @@ mod tests {
         assert!(s.columns.iter().any(|c| c.name == "TABLE_NAME"));
 
         exec(&mut conn, "DROP TABLE qd_t", None).await.ok();
+    }
+
+    // SQLite is bundled and file-based, so this runs unconditionally (no
+    // container, no gate) against a temp database file.
+    #[tokio::test]
+    async fn sqlite_query_roundtrip() {
+        let path = std::env::temp_dir().join(format!("querydeck-test-{}.sqlite", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        std::fs::write(&path, b"").expect("create empty db file"); // 0 bytes = empty SQLite db
+
+        let cfg = ConnConfig {
+            engine: Engine::Sqlite,
+            host: String::new(),
+            port: 0,
+            username: String::new(),
+            password: String::new(),
+            database: path.to_string_lossy().into_owned(),
+            encrypt: false,
+            trust_cert: false,
+        };
+
+        let mut conn = build_client(&cfg).await.expect("open");
+        exec(&mut conn, "CREATE TABLE t (i INTEGER, r REAL, s TEXT, n INTEGER, b BLOB)", None)
+            .await
+            .expect("create");
+        exec(&mut conn, "INSERT INTO t VALUES (42, 3.5, 'hi', NULL, x'00ff')", None)
+            .await
+            .expect("insert");
+
+        let res = exec(&mut conn, "SELECT i, r, s, n, b FROM t", None).await.expect("query");
+        assert_eq!(res.row_count, 1);
+        let row = &res.rows[0];
+        assert_eq!(row[0], serde_json::json!(42)); // INTEGER
+        assert_eq!(row[1], serde_json::json!(3.5)); // REAL
+        assert_eq!(row[2], serde_json::json!("hi")); // TEXT
+        assert_eq!(row[3], Value::Null); // NULL
+        assert_eq!(row[4], serde_json::json!("0x00ff")); // BLOB
+
+        let s = exec(&mut conn, schema_sql(Engine::Sqlite), None).await.expect("schema");
+        assert!(s.columns.iter().any(|c| c.name == "TABLE_NAME"));
+        assert!(s.rows.iter().any(|r| r[1] == serde_json::json!("t")));
+
+        drop(conn);
+        let _ = std::fs::remove_file(&path);
     }
 }

@@ -1,13 +1,13 @@
 # QueryDeck
 
-**QueryDeck is a fast, lightweight SQL client for Microsoft SQL Server, PostgreSQL, and
-MySQL** — a slim, modern alternative to SQL Server Management Studio (SSMS), Azure Data
-Studio, pgAdmin, and MySQL Workbench. Browse your schema, write SQL, and explore and edit
-your data, all in a lightweight native app. (SQLite is on the way.)
+**QueryDeck is a fast, lightweight SQL client for Microsoft SQL Server, PostgreSQL,
+MySQL, and SQLite** — a slim, modern alternative to SQL Server Management Studio (SSMS),
+Azure Data Studio, pgAdmin, and MySQL Workbench. Browse your schema, write SQL, and
+explore and edit your data, all in a lightweight native app.
 
 Built with **Tauri 2 + React + TypeScript** and a small Rust core using
 [`tiberius`](https://github.com/prisma/tiberius) for SQL Server and
-[`sqlx`](https://github.com/launchbadge/sqlx) for PostgreSQL and MySQL.
+[`sqlx`](https://github.com/launchbadge/sqlx) for PostgreSQL, MySQL, and SQLite.
 
 > Windows-first. ~10 MB installer (uses the OS WebView2 runtime — no bundled Chromium).
 
@@ -140,9 +140,9 @@ SQL Server types.
 
 **What is QueryDeck?**
 QueryDeck is a fast, lightweight desktop SQL client for Microsoft SQL Server, PostgreSQL,
-and MySQL. It lets you connect to a database, browse its schema, write and run SQL, and
-view and edit results — in a small native app built with Tauri, React, and a Rust core
-(`tiberius` for SQL Server, `sqlx` for PostgreSQL and MySQL).
+MySQL, and SQLite. It lets you connect to a database, browse its schema, write and run
+SQL, and view and edit results — in a small native app built with Tauri, React, and a Rust
+core (`tiberius` for SQL Server, `sqlx` for PostgreSQL/MySQL/SQLite).
 
 **Is QueryDeck free?**
 Yes. QueryDeck is free and open source under the [MIT license](LICENSE).
@@ -154,9 +154,9 @@ query, edit, export — without the weight of the larger tools.
 
 **Which databases does QueryDeck support?**
 Microsoft SQL Server (including Azure SQL and SQL Server in Docker) via the
-`tiberius` driver, plus **PostgreSQL** and **MySQL/MariaDB** via `sqlx`. SQLite is
-planned next (see [docs/ROADMAP.md](docs/ROADMAP.md)). Inline result editing is
-currently SQL Server only.
+`tiberius` driver, plus **PostgreSQL**, **MySQL/MariaDB**, and **SQLite** via `sqlx`
+(see [docs/ROADMAP.md](docs/ROADMAP.md)). Inline result editing is currently SQL Server
+only.
 
 **Which platforms does it run on?**
 Windows-first, with builds for macOS and Linux. Passwords are stored in the OS keychain

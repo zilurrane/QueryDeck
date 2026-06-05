@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useStore } from "../lib/store";
 import * as api from "../lib/api";
-import { ENGINES, engineDef, type ConnConfig, type Engine, type Env } from "../lib/types";
+import { ENGINES, engineDef, isFileEngine, type ConnConfig, type Engine, type Env } from "../lib/types";
 
 export function ConnectionModal() {
   const setModalOpen = useStore((s) => s.setModalOpen);
@@ -32,6 +32,7 @@ export function ConnectionModal() {
   const [busy, setBusy] = useState(false);
 
   const upd = (patch: Partial<ConnConfig>) => setCfg((c) => ({ ...c, ...patch }));
+  const isFile = isFileEngine(cfg.engine); // SQLite: a file path, no host/port/auth
 
   const runTest = async () => {
     setBusy(true);
@@ -78,33 +79,46 @@ export function ConnectionModal() {
             <label>Connection name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-          <div className="field">
-            <label>Host / server</label>
-            <input value={cfg.host} onChange={(e) => upd({ host: e.target.value })} />
-          </div>
-          <div className="field">
-            <label>Port</label>
-            <input
-              value={cfg.port}
-              onChange={(e) => upd({ port: Number(e.target.value) || 1433 })}
-            />
-          </div>
-          <div className="field">
-            <label>Login</label>
-            <input value={cfg.username} onChange={(e) => upd({ username: e.target.value })} />
-          </div>
-          <div className="field">
-            <label>Password</label>
-            <input
-              type="password"
-              value={cfg.password}
-              onChange={(e) => upd({ password: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>Database</label>
-            <input value={cfg.database} onChange={(e) => upd({ database: e.target.value })} />
-          </div>
+          {isFile ? (
+            <div className="field full">
+              <label>Database file</label>
+              <input
+                value={cfg.database}
+                onChange={(e) => upd({ database: e.target.value })}
+                placeholder="/path/to/database.sqlite"
+              />
+            </div>
+          ) : (
+            <>
+              <div className="field">
+                <label>Host / server</label>
+                <input value={cfg.host} onChange={(e) => upd({ host: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Port</label>
+                <input
+                  value={cfg.port}
+                  onChange={(e) => upd({ port: Number(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="field">
+                <label>Login</label>
+                <input value={cfg.username} onChange={(e) => upd({ username: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Password</label>
+                <input
+                  type="password"
+                  value={cfg.password}
+                  onChange={(e) => upd({ password: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <label>Database</label>
+                <input value={cfg.database} onChange={(e) => upd({ database: e.target.value })} />
+              </div>
+            </>
+          )}
           <div className="field">
             <label>Environment</label>
             <select className="select" value={env} onChange={(e) => setEnv(e.target.value as Env)}>
@@ -113,21 +127,25 @@ export function ConnectionModal() {
               <option value="prod">prod</option>
             </select>
           </div>
-          <div className="toggles">
-            <div className="tog" onClick={() => upd({ encrypt: !cfg.encrypt })}>
-              <span className={`sw ${cfg.encrypt ? "on" : ""}`} /> Encrypt
+          {!isFile && (
+            <div className="toggles">
+              <div className="tog" onClick={() => upd({ encrypt: !cfg.encrypt })}>
+                <span className={`sw ${cfg.encrypt ? "on" : ""}`} /> Encrypt
+              </div>
+              <div className="tog" onClick={() => upd({ trust_cert: !cfg.trust_cert })}>
+                <span className={`sw ${cfg.trust_cert ? "on" : ""}`} /> Trust certificate
+              </div>
             </div>
-            <div className="tog" onClick={() => upd({ trust_cert: !cfg.trust_cert })}>
-              <span className={`sw ${cfg.trust_cert ? "on" : ""}`} /> Trust certificate
-            </div>
-          </div>
+          )}
           <div className="toggles">
             <div className="tog" onClick={() => setSave(!save)}>
               <span className={`sw ${save ? "on" : ""}`} /> Save connection
             </div>
-            <div className="tog" onClick={() => setSavePassword(!savePassword)}>
-              <span className={`sw ${savePassword ? "on" : ""}`} /> Save password (Credential Manager)
-            </div>
+            {!isFile && (
+              <div className="tog" onClick={() => setSavePassword(!savePassword)}>
+                <span className={`sw ${savePassword ? "on" : ""}`} /> Save password (Credential Manager)
+              </div>
+            )}
           </div>
         </div>
         <div className="foot">

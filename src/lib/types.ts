@@ -1,7 +1,7 @@
 // Mirrors the Rust structs in src-tauri/src/db.rs (snake_case nested fields).
 
 // Supported database engines (matches the Rust `Engine` enum, lowercase).
-export type Engine = "mssql" | "postgres" | "mysql";
+export type Engine = "mssql" | "postgres" | "mysql" | "sqlite";
 
 export interface EngineDef {
   id: Engine;
@@ -16,7 +16,11 @@ export const ENGINES: EngineDef[] = [
   { id: "mssql", name: "SQL Server", dialect: "T-SQL", defaultPort: 1433, defaultUser: "sa", defaultDatabase: "master" },
   { id: "postgres", name: "PostgreSQL", dialect: "PostgreSQL", defaultPort: 5432, defaultUser: "postgres", defaultDatabase: "postgres" },
   { id: "mysql", name: "MySQL", dialect: "MySQL", defaultPort: 3306, defaultUser: "root", defaultDatabase: "" },
+  { id: "sqlite", name: "SQLite", dialect: "SQLite", defaultPort: 0, defaultUser: "", defaultDatabase: "" },
 ];
+
+// SQLite is file-based (a path in `database`); the rest are host/port/auth servers.
+export const isFileEngine = (e: Engine | undefined): boolean => e === "sqlite";
 
 export const engineDef = (id: Engine | undefined): EngineDef =>
   ENGINES.find((e) => e.id === id) ?? ENGINES[0];

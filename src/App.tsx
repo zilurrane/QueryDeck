@@ -92,7 +92,7 @@ export default function App() {
             <div className="welcome">
               <img className="wmark" src="/icon.png" alt="" />
               <h1>Welcome to QueryDeck</h1>
-              <p>A fast, focused SQL studio for SQL Server, PostgreSQL, and MySQL. Connect to a database to browse its schema, write SQL, and explore your data.</p>
+              <p>A fast, focused SQL studio for SQL Server, PostgreSQL, MySQL, and SQLite. Connect to a database to browse its schema, write SQL, and explore your data.</p>
               <div className="wbtn" onClick={() => setModalOpen(true)}>🔌 New connection</div>
             </div>
           ) : (

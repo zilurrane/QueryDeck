@@ -52,14 +52,14 @@ export function Sidebar() {
     `${t.schema}.${t.name}`.toLowerCase().includes(filter.toLowerCase())
   );
 
-  // Dialect-aware identifier quoting: [x] for T-SQL, "x" for PostgreSQL,
-  // `x` for MySQL.
+  // Dialect-aware identifier quoting: [x] for T-SQL, `x` for MySQL,
+  // "x" for PostgreSQL and SQLite.
   const quoteId = (s: string) =>
-    conn?.engine === "postgres"
-      ? `"${s.replace(/"/g, '""')}"`
+    conn?.engine === "mssql"
+      ? `[${s.replace(/]/g, "]]")}]`
       : conn?.engine === "mysql"
         ? `\`${s.replace(/`/g, "``")}\``
-        : `[${s.replace(/]/g, "]]")}]`;
+        : `"${s.replace(/"/g, '""')}"`;
   const qualified = (t: Table) => `${quoteId(t.schema)}.${quoteId(t.name)}`;
 
   const peek = (t: Table) => {

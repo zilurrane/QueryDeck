@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 QueryDeck is a desktop SQL client built with **Tauri 2** — a React/TypeScript frontend
 (`src/`) over a small Rust backend (`src-tauri/`). It connects to **SQL Server** via the
-`tiberius` driver and **PostgreSQL** and **MySQL** via `sqlx` (SQLite planned).
-Windows-first; also builds for macOS/Linux.
+`tiberius` driver and **PostgreSQL, MySQL, and SQLite** via `sqlx`. Windows-first; also
+builds for macOS/Linux.
 
 ## Commands
 
@@ -42,7 +42,7 @@ both `db.rs` (producer) and `src/lib/types.ts` (consumer types) must move togeth
 
 - **Connection registry (`db.rs`):** `DbState` holds a map of connection id → live
   connection. Each connection is an `AnyConn` enum (`Mssql(tiberius)` / `Postgres(sqlx)` /
-  `Mysql(sqlx)`);
+  `Mysql(sqlx)` / `Sqlite(sqlx)`; SQLite is file-based — the path lives in `ConnConfig.database`);
   `build_client`/`exec`/`list_schema`/`schema_sql` dispatch on `ConnConfig.engine`, and the
   per-engine cell→JSON mappers funnel into the same `QueryResult`. To add an engine: a new
   `Engine` variant, an `AnyConn` arm, a cell mapper, and a `schema_sql` case. `connect` opens

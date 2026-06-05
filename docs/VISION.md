@@ -1,9 +1,9 @@
 # QueryDeck — Product Vision
 
-A fast, focused desktop **SQL client for Microsoft SQL Server, PostgreSQL, and
-MySQL** — a slim, modern alternative to SSMS / Azure Data Studio / pgAdmin /
-MySQL Workbench. Built with **Tauri + React + TypeScript**, with a small Rust
-core (`tiberius` + `sqlx`).
+A fast, focused desktop **SQL client for Microsoft SQL Server, PostgreSQL,
+MySQL, and SQLite** — a slim, modern alternative to SSMS / Azure Data Studio /
+pgAdmin / MySQL Workbench. Built with **Tauri + React + TypeScript**, with a
+small Rust core (`tiberius` + `sqlx`).
 
 ---
 
