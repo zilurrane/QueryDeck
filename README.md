@@ -55,6 +55,25 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for what's shipped and what's planned, an
 
 ---
 
+## Install
+
+Grab the installer for your OS from the
+[latest release](https://github.com/zilurrane/QueryDeck/releases/latest):
+
+- **Windows** — `.msi` or `.exe`
+- **macOS** — `.dmg` (Apple Silicon `aarch64` or Intel `x64`)
+- **Linux** — `.AppImage`, `.deb`, or `.rpm`
+
+> **First‑run warning?** QueryDeck isn't yet signed with an OS code‑signing
+> certificate, so Windows and macOS show a one‑time "unverified publisher"
+> prompt. It's safe to proceed — the installers are cryptographically signed for
+> the in‑app updater.
+> - **Windows (SmartScreen):** click **More info → Run anyway**.
+> - **macOS (Gatekeeper):** right‑click the app → **Open** and confirm (or
+>   System Settings → Privacy & Security → **Open Anyway**).
+
+---
+
 ## Getting started
 
 ### Prerequisites

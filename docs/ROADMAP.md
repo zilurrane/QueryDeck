@@ -67,7 +67,7 @@ engineering / release hardening surfaced after the first signed release.
 *Surfaced after the first signed release (v0.1.1). Not user-facing features, but
 they gate trust, distribution, and contributor velocity.*
 
-- **E-1** OS code signing — Windows Authenticode + macOS notarization (Apple Developer cert). Without it, installs trip SmartScreen / Gatekeeper. **Blocks macOS auto-update** (Gatekeeper won't let the updater replace an unsigned `.app` in place). The updater's own minisign signing is already done; this is OS-level trust.
+- **E-1** OS code signing — Windows Authenticode + macOS notarization (Apple Developer cert). Without it, installs trip SmartScreen / Gatekeeper. **Blocks macOS auto-update** (Gatekeeper won't let the updater replace an unsigned `.app` in place). The updater's own minisign signing is already done; this is OS-level trust. **Free path for Windows via SignPath Foundation (OSS); macOS needs the $99/yr Apple program — see [CODE_SIGNING.md](CODE_SIGNING.md).**
 - **E-2** PR continuous integration — run `npm run build` (tsc) + `cargo check` on pull requests. Today the only automated check is `tsc` during build, and CI runs solely on release tags.
 - **E-3** Test suite — there are currently no tests. Start with the SQL-builder helpers in `store.ts` (`ident`/`sqlLiteral`/`whereClause`/`coerce`) and the type normalization in `db.rs` (`cell_to_json`/`type_name`).
 - **E-4** Frontend bundle splitting — the build emits one ~995 KB JS chunk (302 KB gzip) and warns. Code-split heavy deps (CodeMirror, `sql-formatter`, react-table) via dynamic `import()` / `manualChunks`.
