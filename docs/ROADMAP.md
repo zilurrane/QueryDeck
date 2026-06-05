@@ -6,7 +6,9 @@ run query (Ctrl+Enter), type-aware results grid, query tabs, welcome state,
 frameless window with custom controls.
 **Phase 1 (all P1-1..P1-18) implemented** — see below; all marked ✅.
 
-Phase 2 items are still open — pick by ID (e.g. "build P2-1, P2-4").
+Phase 2 mostly open — **P2-3 (editable results)** and **P2-13 (auto-update)** are
+shipped. Pick remaining items by ID (e.g. "build P2-1, P2-4"). Phase 3 tracks
+engineering / release hardening surfaced after the first signed release.
 
 ---
 
@@ -56,11 +58,26 @@ Phase 2 items are still open — pick by ID (e.g. "build P2-1, P2-4").
 - **P2-10** Snippets library + parameterized queries (`@vars`)
 - **P2-11** Prod safe-mode (read-only guard, confirm on writes) + connection color coding
 - **P2-12** DB insights — table/index sizes, row counts dashboard
-- **P2-13** Auto-update (Tauri updater)
+- **P2-13** ✅ Auto-update (Tauri updater) — signed releases via GitHub Actions; silent startup check + manual check in Settings; verified end-to-end on v0.1.1
 
 ---
 
-## Recommended first build
-**P1-1 + P1-2 + P1-3 + P1-4** (persistence cluster) — the biggest day-to-day
-quality-of-life jump; unblocks history/favorites and stops re-typing
-connection details every launch.
+## Phase 3 — Engineering & release hardening
+*Surfaced after the first signed release (v0.1.1). Not user-facing features, but
+they gate trust, distribution, and contributor velocity.*
+
+- **E-1** OS code signing — Windows Authenticode + macOS notarization (Apple Developer cert). Without it, installs trip SmartScreen / Gatekeeper. **Blocks macOS auto-update** (Gatekeeper won't let the updater replace an unsigned `.app` in place). The updater's own minisign signing is already done; this is OS-level trust.
+- **E-2** PR continuous integration — run `npm run build` (tsc) + `cargo check` on pull requests. Today the only automated check is `tsc` during build, and CI runs solely on release tags.
+- **E-3** Test suite — there are currently no tests. Start with the SQL-builder helpers in `store.ts` (`ident`/`sqlLiteral`/`whereClause`/`coerce`) and the type normalization in `db.rs` (`cell_to_json`/`type_name`).
+- **E-4** Frontend bundle splitting — the build emits one ~995 KB JS chunk (302 KB gzip) and warns. Code-split heavy deps (CodeMirror, `sql-formatter`, react-table) via dynamic `import()` / `manualChunks`.
+- **E-5** Lint — no ESLint configured; add a minimal config so style/quality issues are caught in CI.
+- **E-6** Updater UX polish — periodic re-check (not just on startup), a "last checked" indicator, richer release-notes rendering, and a cancel control mid-download.
+- **E-7** Release/repo presentation — set the repo homepage to `releases/latest`, add screenshots/GIF + download badges to the README (the SEO/AEO groundwork is in, but there's no visual yet).
+
+---
+
+## Recommended next
+Phase 1 (persistence, editor, results, UX) and the release pipeline are done. From here:
+- **Highest ship-quality:** **E-1** (OS code signing) — without it macOS auto-update silently won't work and Windows installs look untrusted.
+- **Highest user value:** **P2-5** (stored procs/functions) or **P2-7** (`GO` / multi-result execution) — common daily gaps.
+- **Cheap wins:** **E-4** (bundle splitting) + **E-2** (PR CI).
