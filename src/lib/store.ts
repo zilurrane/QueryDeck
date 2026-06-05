@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { format as formatSql } from "sql-formatter";
 import * as api from "./api";
 import * as persist from "./persist";
+import * as updater from "./updater";
 import {
   DEFAULT_SETTINGS,
   THEMES,
@@ -17,6 +18,25 @@ import {
   type Tab,
   type ThemeId,
 } from "./types";
+
+export type UpdateStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "uptodate"
+  | "error";
+
+export interface UpdateState {
+  status: UpdateStatus;
+  visible: boolean;
+  version?: string;
+  currentVersion?: string;
+  body?: string;
+  downloaded?: number;
+  total?: number | null;
+  error?: string;
+}
 
 let seq = 1;
 const uid = () => `${Date.now().toString(36)}-${(seq++).toString(36)}`;
@@ -75,6 +95,12 @@ interface AppState {
   // history & favorites
   history: HistoryEntry[];
   favorites: SavedQuery[];
+
+  // auto-updater
+  update: UpdateState;
+  checkForUpdates: (opts?: { silent?: boolean }) => Promise<void>;
+  installUpdate: () => Promise<void>;
+  dismissUpdate: () => void;
 
   // lifecycle
   init: () => Promise<void>;
@@ -149,6 +175,50 @@ export const useStore = create<AppState>((set, get) => ({
 
   history: [],
   favorites: [],
+
+  update: { status: "idle", visible: false },
+
+  checkForUpdates: async (opts) => {
+    const silent = opts?.silent ?? false;
+    // Avoid stacking checks (e.g. startup check + a manual click).
+    if (get().update.status === "checking" || get().update.status === "downloading") return;
+    set({ update: { status: "checking", visible: !silent } });
+    try {
+      const info = await updater.checkForUpdate();
+      if (info) {
+        set({
+          update: {
+            status: "available",
+            visible: true,
+            version: info.version,
+            currentVersion: info.currentVersion,
+            body: info.body,
+          },
+        });
+      } else {
+        const currentVersion = await updater.currentVersion().catch(() => undefined);
+        set({ update: { status: "uptodate", visible: !silent, currentVersion } });
+      }
+    } catch (e) {
+      // On a silent startup check (e.g. offline, no release yet) stay quiet.
+      set({ update: { status: "error", visible: !silent, error: String(e) } });
+    }
+  },
+
+  installUpdate: async () => {
+    if (get().update.status !== "available") return;
+    set((s) => ({ update: { ...s.update, status: "downloading", visible: true, downloaded: 0, total: null } }));
+    try {
+      await updater.downloadAndInstall((downloaded, total) => {
+        set((s) => ({ update: { ...s.update, downloaded, total } }));
+      });
+      // downloadAndInstall relaunches the app; nothing runs after this on success.
+    } catch (e) {
+      set((s) => ({ update: { ...s.update, status: "error", error: String(e) } }));
+    }
+  },
+
+  dismissUpdate: () => set((s) => ({ update: { ...s.update, visible: false } })),
 
   init: async () => {
     const [settings, savedConnections, history, favorites] = await Promise.all([

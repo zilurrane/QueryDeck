@@ -80,6 +80,38 @@ npm run tauri dev
 npm run tauri build
 ```
 
+### Releases & auto-update
+QueryDeck ships an in-app auto-updater (Tauri's `updater` plugin). On startup it
+silently checks for a new version, and **Settings → Check for updates** triggers a
+manual check; when one is found the user can install and relaunch in place.
+
+Updates are served from this repo's **GitHub Releases**. The endpoint and signing
+public key live in `src-tauri/tauri.conf.json` under `plugins.updater`.
+
+**Publishing a release** is automated by `.github/workflows/release.yml` — push a
+version tag and it builds signed installers for Windows/macOS/Linux and uploads a
+`latest.json` manifest:
+```bash
+# bump "version" in src-tauri/tauri.conf.json first, then:
+git tag v0.1.1 && git push origin v0.1.1
+```
+The workflow creates a **draft** release; review it and publish, and clients will
+pick it up (the endpoint points at the latest published release).
+
+**One-time setup** — the release workflow runs in the **`Prod`** GitHub Environment
+(Settings → Environments → Prod). Add two secrets there:
+- `TAURI_SIGNING_PRIVATE_KEY` — contents of the private key generated with
+  `npm run tauri signer generate`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — its password (empty string if none)
+
+> If the `Prod` environment has protection rules (required reviewers, or a
+> deployment-branch/tag allow-list), the release job will wait for approval or be
+> blocked — make sure your `v*` tags are permitted.
+
+> ⚠️ Keep the private key out of the repo. If it's lost, existing installs can no
+> longer verify updates. Rotating it requires shipping a build with the new public
+> key by a non-updater channel.
+
 ---
 
 ## Project structure

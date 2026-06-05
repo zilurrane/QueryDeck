@@ -10,6 +10,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Editor } from "./components/Editor";
 import { Results } from "./components/Results";
 import { WindowControls } from "./components/WindowControls";
+import { UpdateModal } from "./components/UpdateModal";
 
 export default function App() {
   const settings = useStore((s) => s.settings);
@@ -23,6 +24,7 @@ export default function App() {
   const settingsOpen = useStore((s) => s.settingsOpen);
   const paletteOpen = useStore((s) => s.paletteOpen);
   const objectSearchOpen = useStore((s) => s.objectSearchOpen);
+  const updateVisible = useStore((s) => s.update.visible);
 
   const tabs = useStore((s) => s.tabs);
   const activeTabId = useStore((s) => s.activeTabId);
@@ -34,6 +36,8 @@ export default function App() {
 
   useEffect(() => {
     init();
+    // Silently check for updates on startup; only surfaces UI if one is found.
+    useStore.getState().checkForUpdates({ silent: true });
   }, [init]);
 
   useEffect(() => {
@@ -112,6 +116,7 @@ export default function App() {
       {settingsOpen && <SettingsModal />}
       {paletteOpen && <CommandPalette />}
       {objectSearchOpen && <ObjectSearch />}
+      {updateVisible && <UpdateModal />}
     </div>
   );
 }

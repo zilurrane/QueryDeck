@@ -5,6 +5,8 @@ export function SettingsModal() {
   const settings = useStore((s) => s.settings);
   const setSettings = useStore((s) => s.setSettings);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
+  const checkForUpdates = useStore((s) => s.checkForUpdates);
+  const updateStatus = useStore((s) => s.update.status);
   const close = () => setSettingsOpen(false);
 
   return (
@@ -50,6 +52,17 @@ export function SettingsModal() {
               value={settings.fontSize}
               onChange={(e) => setSettings({ fontSize: Number(e.target.value) })}
             />
+          </div>
+
+          <div className="field">
+            <label>Updates</label>
+            <button
+              className="btn ghost"
+              disabled={updateStatus === "checking" || updateStatus === "downloading"}
+              onClick={() => checkForUpdates({ silent: false })}
+            >
+              {updateStatus === "checking" ? "Checking…" : "Check for updates"}
+            </button>
           </div>
         </div>
         <div className="foot">
