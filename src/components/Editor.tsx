@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import CodeMirror from "@uiw/react-codemirror";
-import { sql, MSSQL, PostgreSQL } from "@codemirror/lang-sql";
+import { sql, MSSQL, PostgreSQL, MySQL } from "@codemirror/lang-sql";
 import { keymap } from "@codemirror/view";
 import { Prec } from "@codemirror/state";
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
@@ -25,7 +25,8 @@ export function Editor() {
   };
 
   const dark = THEMES.find((t) => t.id === settings.themeId)?.dark ?? true;
-  const dialect = conn?.engine === "postgres" ? PostgreSQL : MSSQL;
+  const dialect =
+    conn?.engine === "postgres" ? PostgreSQL : conn?.engine === "mysql" ? MySQL : MSSQL;
   const dialectName = engineDef(conn?.engine).dialect;
 
   const runKey = useMemo(

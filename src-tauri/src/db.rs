@@ -19,6 +19,7 @@ use tokio::net::TcpStream;
 use tokio::sync::{Mutex, Notify};
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
+use sqlx::mysql::{MySqlConnectOptions, MySqlConnection, MySqlSslMode};
 use sqlx::postgres::{PgConnectOptions, PgConnection, PgSslMode};
 use sqlx::{Column as _, ConnectOptions, Row as _, TypeInfo as _};
 
@@ -32,6 +33,7 @@ const SERVICE: &str = "QueryDeck";
 pub enum Engine {
     Mssql,
     Postgres,
+    Mysql,
 }
 
 impl Default for Engine {
@@ -44,6 +46,7 @@ impl Default for Engine {
 enum AnyConn {
     Mssql(SqlClient),
     Postgres(PgConnection),
+    Mysql(MySqlConnection),
 }
 
 struct Conn {
@@ -107,6 +110,7 @@ async fn build_client(cfg: &ConnConfig) -> Result<AnyConn, String> {
     match cfg.engine {
         Engine::Mssql => Ok(AnyConn::Mssql(build_mssql(cfg).await?)),
         Engine::Postgres => Ok(AnyConn::Postgres(build_postgres(cfg).await?)),
+        Engine::Mysql => Ok(AnyConn::Mysql(build_mysql(cfg).await?)),
     }
 }
 
@@ -148,6 +152,25 @@ async fn build_postgres(cfg: &ConnConfig) -> Result<PgConnection, String> {
     opts.connect().await.map_err(err)
 }
 
+async fn build_mysql(cfg: &ConnConfig) -> Result<MySqlConnection, String> {
+    let ssl_mode = match (cfg.encrypt, cfg.trust_cert) {
+        (true, true) => MySqlSslMode::Required,        // encrypt, no cert verification
+        (true, false) => MySqlSslMode::VerifyIdentity, // encrypt + verify
+        (false, _) => MySqlSslMode::Preferred,         // opportunistic
+    };
+    let mut opts = MySqlConnectOptions::new()
+        .host(&cfg.host)
+        .port(cfg.port)
+        .username(&cfg.username)
+        .password(&cfg.password)
+        .ssl_mode(ssl_mode);
+    // MySQL can connect without selecting a database.
+    if !cfg.database.is_empty() {
+        opts = opts.database(&cfg.database);
+    }
+    opts.connect().await.map_err(err)
+}
+
 // ---------------------------------------------------------------------------
 // Execution (dispatches per engine, normalises to QueryResult)
 // ---------------------------------------------------------------------------
@@ -157,6 +180,7 @@ async fn exec(conn: &mut AnyConn, sql: &str, cap: Option<usize>) -> Result<Query
     match conn {
         AnyConn::Mssql(c) => exec_mssql(c, sql, cap, start).await,
         AnyConn::Postgres(c) => exec_postgres(c, sql, cap, start).await,
+        AnyConn::Mysql(c) => exec_mysql(c, sql, cap, start).await,
     }
 }
 
@@ -238,6 +262,44 @@ async fn exec_postgres(
         let mut vals = Vec::with_capacity(columns.len());
         for i in 0..columns.len() {
             vals.push(pg_cell_to_json(row, i));
+        }
+        rows.push(vals);
+    }
+
+    Ok(finish(columns, rows, start))
+}
+
+async fn exec_mysql(
+    conn: &mut MySqlConnection,
+    sql: &str,
+    cap: Option<usize>,
+    start: Instant,
+) -> Result<QueryResult, String> {
+    let raw = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .fetch_all(&mut *conn)
+        .await
+        .map_err(err)?;
+
+    let mut columns: Vec<Column> = Vec::new();
+    let mut rows: Vec<Vec<Value>> = Vec::new();
+
+    for row in &raw {
+        if columns.is_empty() {
+            columns = row
+                .columns()
+                .iter()
+                .map(|c| Column {
+                    name: c.name().to_string(),
+                    type_name: c.type_info().name().to_lowercase(),
+                })
+                .collect();
+        }
+        if cap.is_some_and(|n| rows.len() >= n) {
+            break;
+        }
+        let mut vals = Vec::with_capacity(columns.len());
+        for i in 0..columns.len() {
+            vals.push(mysql_cell_to_json(row, i));
         }
         rows.push(vals);
     }
@@ -400,6 +462,54 @@ fn pg_cell_to_json(row: &sqlx::postgres::PgRow, idx: usize) -> Value {
 }
 
 // ---------------------------------------------------------------------------
+// MySQL value mapping
+// ---------------------------------------------------------------------------
+
+fn mysql_cell_to_json(row: &sqlx::mysql::MySqlRow, idx: usize) -> Value {
+    use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+
+    macro_rules! try_as {
+        ($t:ty, $f:expr) => {
+            if let Ok(v) = row.try_get::<Option<$t>, usize>(idx) {
+                return v.map($f).unwrap_or(Value::Null);
+            }
+        };
+    }
+
+    // Signed and unsigned integer widths, then floats/decimal, strings,
+    // temporals, json, and binary last.
+    try_as!(i8, Value::from);
+    try_as!(i16, Value::from);
+    try_as!(i32, Value::from);
+    try_as!(i64, Value::from);
+    try_as!(u8, Value::from);
+    try_as!(u16, Value::from);
+    try_as!(u32, Value::from);
+    try_as!(u64, Value::from);
+    try_as!(f32, |n| Value::from(n as f64));
+    try_as!(f64, Value::from);
+    try_as!(rust_decimal::Decimal, |d| {
+        d.to_string()
+            .parse::<f64>()
+            .map(Value::from)
+            .unwrap_or(Value::String(d.to_string()))
+    });
+    try_as!(String, Value::String);
+    try_as!(NaiveDateTime, |d| Value::String(
+        d.format("%Y-%m-%d %H:%M:%S").to_string()
+    ));
+    try_as!(DateTime<Utc>, |d| Value::String(d.to_rfc3339()));
+    try_as!(NaiveDate, |d| Value::String(d.to_string()));
+    try_as!(NaiveTime, |d| Value::String(d.to_string()));
+    try_as!(serde_json::Value, |j| j);
+    try_as!(Vec<u8>, |b| {
+        let hex: String = b.iter().map(|x| format!("{:02x}", x)).collect();
+        Value::String(format!("0x{}", hex))
+    });
+    Value::Null
+}
+
+// ---------------------------------------------------------------------------
 // Schema introspection (per engine, aliased to the same column names)
 // ---------------------------------------------------------------------------
 
@@ -421,6 +531,16 @@ fn schema_sql(engine: Engine) -> &'static str {
             JOIN information_schema.columns c \
               ON c.table_schema = t.table_schema AND c.table_name = t.table_name \
             WHERE t.table_schema NOT IN ('pg_catalog', 'information_schema') \
+            ORDER BY t.table_schema, t.table_name, c.ordinal_position",
+        Engine::Mysql => "\
+            SELECT t.table_schema AS `TABLE_SCHEMA`, t.table_name AS `TABLE_NAME`, \
+                   t.table_type AS `TABLE_TYPE`, c.column_name AS `COLUMN_NAME`, \
+                   c.data_type AS `DATA_TYPE`, c.is_nullable AS `IS_NULLABLE`, \
+                   c.ordinal_position AS `ORDINAL_POSITION` \
+            FROM information_schema.tables t \
+            JOIN information_schema.columns c \
+              ON c.table_schema = t.table_schema AND c.table_name = t.table_name \
+            WHERE t.table_schema = DATABASE() \
             ORDER BY t.table_schema, t.table_name, c.ordinal_position",
     }
 }
@@ -618,5 +738,64 @@ mod tests {
         // And the schema-introspection query must run without error.
         let s = exec(&mut conn, schema_sql(Engine::Postgres), None).await.expect("schema");
         assert!(s.columns.iter().any(|c| c.name == "TABLE_NAME"));
+    }
+
+    // Same shape as the Postgres test, against MySQL. Skipped unless
+    // QD_MYSQL_TEST is set. Env: QD_MYSQL_HOST/PORT/USER/PASS/DB.
+    #[tokio::test]
+    async fn mysql_query_roundtrip() {
+        if std::env::var("QD_MYSQL_TEST").is_err() {
+            eprintln!("skipping mysql_query_roundtrip (set QD_MYSQL_TEST=1)");
+            return;
+        }
+        let env = |k: &str, d: &str| std::env::var(k).unwrap_or_else(|_| d.to_string());
+        let cfg = ConnConfig {
+            engine: Engine::Mysql,
+            host: env("QD_MYSQL_HOST", "localhost"),
+            port: env("QD_MYSQL_PORT", "33306").parse().unwrap(),
+            username: env("QD_MYSQL_USER", "root"),
+            password: env("QD_MYSQL_PASS", "secret"),
+            database: env("QD_MYSQL_DB", "qdtest"),
+            encrypt: false,
+            trust_cert: true,
+        };
+
+        let mut conn = build_client(&cfg).await.expect("connect");
+        // Set up a typed table (statements run one at a time — single-statement protocol).
+        exec(&mut conn, "DROP TABLE IF EXISTS qd_t", None).await.expect("drop");
+        exec(
+            &mut conn,
+            "CREATE TABLE qd_t (i INT, b VARCHAR(10), u INT UNSIGNED, d DECIMAL(10,2), \
+             n INT, dt DATETIME, big BIGINT, ti TINYINT)",
+            None,
+        )
+        .await
+        .expect("create");
+        exec(
+            &mut conn,
+            "INSERT INTO qd_t VALUES (1, 'hi', 7, 3.50, NULL, '2020-01-02 03:04:05', 9000000000, 2)",
+            None,
+        )
+        .await
+        .expect("insert");
+
+        let r = exec(&mut conn, "SELECT i, b, u, d, n, dt, big, ti FROM qd_t", None)
+            .await
+            .expect("query");
+        assert_eq!(r.row_count, 1);
+        let row = &r.rows[0];
+        assert_eq!(row[0], serde_json::json!(1));
+        assert_eq!(row[1], serde_json::json!("hi"));
+        assert_eq!(row[2], serde_json::json!(7));
+        assert_eq!(row[3], serde_json::json!(3.5));
+        assert_eq!(row[4], Value::Null);
+        assert_eq!(row[5], serde_json::json!("2020-01-02 03:04:05"));
+        assert_eq!(row[6], serde_json::json!(9000000000_i64));
+        assert_eq!(row[7], serde_json::json!(2));
+
+        let s = exec(&mut conn, schema_sql(Engine::Mysql), None).await.expect("schema");
+        assert!(s.columns.iter().any(|c| c.name == "TABLE_NAME"));
+
+        exec(&mut conn, "DROP TABLE qd_t", None).await.ok();
     }
 }

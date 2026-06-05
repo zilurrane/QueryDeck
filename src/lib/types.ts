@@ -1,7 +1,7 @@
 // Mirrors the Rust structs in src-tauri/src/db.rs (snake_case nested fields).
 
 // Supported database engines (matches the Rust `Engine` enum, lowercase).
-export type Engine = "mssql" | "postgres";
+export type Engine = "mssql" | "postgres" | "mysql";
 
 export interface EngineDef {
   id: Engine;
@@ -15,6 +15,7 @@ export interface EngineDef {
 export const ENGINES: EngineDef[] = [
   { id: "mssql", name: "SQL Server", dialect: "T-SQL", defaultPort: 1433, defaultUser: "sa", defaultDatabase: "master" },
   { id: "postgres", name: "PostgreSQL", dialect: "PostgreSQL", defaultPort: 5432, defaultUser: "postgres", defaultDatabase: "postgres" },
+  { id: "mysql", name: "MySQL", dialect: "MySQL", defaultPort: 3306, defaultUser: "root", defaultDatabase: "" },
 ];
 
 export const engineDef = (id: Engine | undefined): EngineDef =>

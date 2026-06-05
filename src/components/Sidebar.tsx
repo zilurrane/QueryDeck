@@ -52,18 +52,22 @@ export function Sidebar() {
     `${t.schema}.${t.name}`.toLowerCase().includes(filter.toLowerCase())
   );
 
-  // Dialect-aware identifier quoting: [x] for T-SQL, "x" for PostgreSQL.
+  // Dialect-aware identifier quoting: [x] for T-SQL, "x" for PostgreSQL,
+  // `x` for MySQL.
   const quoteId = (s: string) =>
     conn?.engine === "postgres"
       ? `"${s.replace(/"/g, '""')}"`
-      : `[${s.replace(/]/g, "]]")}]`;
+      : conn?.engine === "mysql"
+        ? `\`${s.replace(/`/g, "``")}\``
+        : `[${s.replace(/]/g, "]]")}]`;
   const qualified = (t: Table) => `${quoteId(t.schema)}.${quoteId(t.name)}`;
 
   const peek = (t: Table) => {
+    // MSSQL uses TOP; PostgreSQL and MySQL use LIMIT.
     loadIntoEditor(
-      conn?.engine === "postgres"
-        ? `SELECT *\nFROM ${qualified(t)}\nLIMIT 100;`
-        : `SELECT TOP 100 *\nFROM ${qualified(t)};`
+      conn?.engine === "mssql"
+        ? `SELECT TOP 100 *\nFROM ${qualified(t)};`
+        : `SELECT *\nFROM ${qualified(t)}\nLIMIT 100;`
     );
     run();
   };
