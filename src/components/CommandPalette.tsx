@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useStore } from "../lib/store";
 import { THEMES } from "../lib/types";
 
@@ -36,6 +37,9 @@ export function CommandPalette() {
       { id: "history", label: "Show Query History", run: () => s.setSidePanel("history") },
       { id: "favorites", label: "Show Saved Queries", run: () => s.setSidePanel("favorites") },
       { id: "settings", label: "Open Settings…", run: () => s.setSettingsOpen(true) },
+      { id: "shortcuts", label: "Keyboard Shortcuts", hint: "?", run: () => s.setShortcutsOpen(true) },
+      { id: "about", label: "About QueryDeck", run: () => s.setAboutOpen(true) },
+      { id: "docs", label: "Documentation", run: () => openUrl("https://github.com/zilurrane/QueryDeck#readme").catch(() => {}) },
       ...THEMES.map((t) => ({ id: `theme-${t.id}`, label: `Theme: ${t.name}`, run: () => s.setTheme(t.id) })),
     ];
     if (s.conn) list.push({ id: "disconnect", label: "Disconnect", run: () => s.doDisconnect() });

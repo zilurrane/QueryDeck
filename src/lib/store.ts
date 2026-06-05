@@ -66,6 +66,10 @@ interface AppState {
   setPaletteOpen: (b: boolean) => void;
   objectSearchOpen: boolean;
   setObjectSearchOpen: (b: boolean) => void;
+  aboutOpen: boolean;
+  setAboutOpen: (b: boolean) => void;
+  shortcutsOpen: boolean;
+  setShortcutsOpen: (b: boolean) => void;
   sidePanel: "schema" | "history" | "favorites";
   setSidePanel: (p: AppState["sidePanel"]) => void;
 
@@ -157,6 +161,10 @@ export const useStore = create<AppState>((set, get) => ({
   setPaletteOpen: (b) => set({ paletteOpen: b }),
   objectSearchOpen: false,
   setObjectSearchOpen: (b) => set({ objectSearchOpen: b }),
+  aboutOpen: false,
+  setAboutOpen: (b) => set({ aboutOpen: b }),
+  shortcutsOpen: false,
+  setShortcutsOpen: (b) => set({ shortcutsOpen: b }),
   sidePanel: "schema",
   setSidePanel: (p) => set({ sidePanel: p }),
 
