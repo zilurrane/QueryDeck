@@ -155,8 +155,8 @@ query, edit, export — without the weight of the larger tools.
 **Which databases does QueryDeck support?**
 Microsoft SQL Server (including Azure SQL and SQL Server in Docker) via the
 `tiberius` driver, plus **PostgreSQL**, **MySQL/MariaDB**, and **SQLite** via `sqlx`
-(see [docs/ROADMAP.md](docs/ROADMAP.md)). Inline result editing is currently SQL Server
-only.
+(see [docs/ROADMAP.md](docs/ROADMAP.md)). PK-aware inline result editing
+(UPDATE/DELETE/INSERT) works across all four engines.
 
 **Which platforms does it run on?**
 Windows-first, with builds for macOS and Linux. Passwords are stored in the OS keychain

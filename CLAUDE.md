@@ -55,10 +55,12 @@ both `db.rs` (producer) and `src/lib/types.ts` (consumer types) must move togeth
   components stay thin. New cross-cutting behavior generally belongs here, not in
   components.
 
-- **Editable results** (inline `UPDATE`/`DELETE`/`INSERT`) live entirely in `store.ts`
-  with its SQL-builder helpers (`ident`, `sqlLiteral`, `whereClause`, `coerce`). It is
-  PK-aware and protects identity/computed columns. This is the one place the app
-  generates mutating SQL — treat changes here carefully.
+- **Editable results** (inline `UPDATE`/`DELETE`/`INSERT`) are driven from `store.ts`
+  (`editTable`/`commitCell`/`deleteRow`/`addRow`) but generate SQL through a per-engine
+  `Dialect` in `src/lib/dialects.ts` (`dialectFor(engine)`): identifier quoting, string
+  literals, `TOP` vs `LIMIT`, and the PK / read-only-column introspection queries all vary
+  by engine. It is PK-aware and protects identity/computed/generated columns. This is the
+  one place the app generates mutating SQL — treat changes here carefully.
 
 - **Persistence (`src/lib/persist.ts`)** splits storage by sensitivity: non-secret state
   (settings, connection metadata, query history, favorites) goes to `tauri-plugin-store`

@@ -3,6 +3,7 @@ import { format as formatSql } from "sql-formatter";
 import * as api from "./api";
 import * as persist from "./persist";
 import * as updater from "./updater";
+import { dialectFor, coerceValue, type Dialect } from "./dialects";
 import {
   DEFAULT_SETTINGS,
   THEMES,
@@ -365,28 +366,19 @@ export const useStore = create<AppState>((set, get) => ({
   editTable: async (schema, table) => {
     const { conn } = get();
     if (!conn) return;
-    // Inline editing generates T-SQL (TOP, [brackets], sys.columns); other
-    // engines aren't supported yet — surface a clear message instead of failing.
-    if (conn.engine !== "mssql") {
-      set({ error: "Inline table editing is currently available for SQL Server only." });
-      return;
-    }
+    const d = dialectFor(conn.engine);
     set({ running: true, error: null });
     try {
-      const pkRes = await api.runQuery(conn.id, pkSql(schema, table), null);
+      const pkRes = await api.runQuery(conn.id, d.pkQuery(schema, table), null);
       const pk = pkRes.rows.map((r) => String(r[0]));
       let readonly: string[] = [];
       try {
-        const roRes = await api.runQuery(conn.id, readonlySql(schema, table), null);
+        const roRes = await api.runQuery(conn.id, d.readonlyQuery(schema, table), null);
         readonly = roRes.rows.map((r) => String(r[0]).toLowerCase());
       } catch {
-        /* sys.columns unavailable — fall back to no read-only detection */
+        /* introspection unavailable — fall back to no read-only detection */
       }
-      const data = await api.runQuery(
-        conn.id,
-        `SELECT TOP 200 * FROM ${ident(schema)}.${ident(table)}`,
-        null
-      );
+      const data = await api.runQuery(conn.id, d.browse(schema, table, 200), null);
       set({ result: data, edit: { schema, table, pk, readonly }, running: false, error: null });
     } catch (e) {
       set({ error: String(e), running: false, edit: null, result: null });
@@ -398,21 +390,22 @@ export const useStore = create<AppState>((set, get) => ({
   commitCell: async (rowIdx, colIdx, raw) => {
     const { conn, result, edit } = get();
     if (!conn || !result || !edit || edit.pk.length === 0) return;
+    const d = dialectFor(conn.engine);
     const col = result.columns[colIdx];
     if (edit.readonly.includes(col.name.toLowerCase())) {
       set({ error: `Column "${col.name}" is read-only (identity/computed)` });
       return;
     }
-    const where = whereClause(result, edit.pk, rowIdx);
+    const where = whereClause(d, result, edit.pk, rowIdx);
     if (!where) {
       set({ error: "Cannot edit row: primary key value unavailable" });
       return;
     }
-    const sql = `UPDATE ${ident(edit.schema)}.${ident(edit.table)} SET ${ident(col.name)} = ${sqlLiteral(raw, col.type)} WHERE ${where}`;
+    const sql = `UPDATE ${d.qualified(edit.schema, edit.table)} SET ${d.ident(col.name)} = ${d.literal(raw, col.type)} WHERE ${where}`;
     try {
       await api.runQuery(conn.id, sql, null);
       const rows = result.rows.map((r, i) =>
-        i === rowIdx ? r.map((v, j) => (j === colIdx ? coerce(raw, col.type) : v)) : r
+        i === rowIdx ? r.map((v, j) => (j === colIdx ? coerceValue(raw, col.type) : v)) : r
       );
       set({ result: { ...result, rows }, error: null });
     } catch (e) {
@@ -423,12 +416,13 @@ export const useStore = create<AppState>((set, get) => ({
   deleteRow: async (rowIdx) => {
     const { conn, result, edit } = get();
     if (!conn || !result || !edit) return;
-    const where = whereClause(result, edit.pk, rowIdx);
+    const d = dialectFor(conn.engine);
+    const where = whereClause(d, result, edit.pk, rowIdx);
     if (!where) {
       set({ error: "Cannot delete row: primary key value unavailable" });
       return;
     }
-    const sql = `DELETE FROM ${ident(edit.schema)}.${ident(edit.table)} WHERE ${where}`;
+    const sql = `DELETE FROM ${d.qualified(edit.schema, edit.table)} WHERE ${where}`;
     try {
       await api.runQuery(conn.id, sql, null);
       const rows = result.rows.filter((_, i) => i !== rowIdx);
@@ -441,21 +435,18 @@ export const useStore = create<AppState>((set, get) => ({
   addRow: async (values) => {
     const { conn, result, edit } = get();
     if (!conn || !result || !edit) return;
+    const d = dialectFor(conn.engine);
     const ro = new Set(edit.readonly);
     const cols = result.columns.filter(
       (c) => !ro.has(c.name.toLowerCase()) && (values[c.name] ?? "") !== ""
     );
     if (cols.length === 0) return;
-    const colList = cols.map((c) => ident(c.name)).join(", ");
-    const valList = cols.map((c) => sqlLiteral(values[c.name], c.type)).join(", ");
-    const sql = `INSERT INTO ${ident(edit.schema)}.${ident(edit.table)} (${colList}) VALUES (${valList})`;
+    const colList = cols.map((c) => d.ident(c.name)).join(", ");
+    const valList = cols.map((c) => d.literal(values[c.name], c.type)).join(", ");
+    const sql = `INSERT INTO ${d.qualified(edit.schema, edit.table)} (${colList}) VALUES (${valList})`;
     try {
       await api.runQuery(conn.id, sql, null);
-      const data = await api.runQuery(
-        conn.id,
-        `SELECT TOP 200 * FROM ${ident(edit.schema)}.${ident(edit.table)}`,
-        null
-      );
+      const data = await api.runQuery(conn.id, d.browse(edit.schema, edit.table, 200), null);
       set({ result: data, error: null });
     } catch (e) {
       set({ error: String(e) });
@@ -502,59 +493,15 @@ function pushHistory(
 }
 
 // ---- SQL helpers for editable results (P2-3) ----
+// Per-engine SQL generation lives in ./dialects; this builds the PK-matching
+// WHERE clause used by UPDATE/DELETE through the active dialect.
 
-const NUMERIC = new Set([
-  "int", "bigint", "smallint", "tinyint", "float", "real",
-  "decimal", "numeric", "money", "smallmoney",
-]);
-
-const ident = (name: string) => `[${name.replace(/]/g, "]]")}]`;
-const sqlStr = (s: string) => `N'${s.replace(/'/g, "''")}'`;
-
-function pkSql(schema: string, table: string): string {
-  return `SELECT kcu.COLUMN_NAME \
-FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc \
-JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu \
-  ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA \
-WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY' \
-  AND tc.TABLE_SCHEMA = ${sqlStr(schema)} AND tc.TABLE_NAME = ${sqlStr(table)} \
-ORDER BY kcu.ORDINAL_POSITION`;
-}
-
-function readonlySql(schema: string, table: string): string {
-  return `SELECT c.name FROM sys.columns c \
-WHERE c.object_id = OBJECT_ID(${sqlStr(`${ident(schema)}.${ident(table)}`)}) \
-  AND (c.is_identity = 1 OR c.is_computed = 1)`;
-}
-
-function sqlLiteral(v: unknown, type: string): string {
-  if (v === null || v === undefined) return "NULL";
-  const t = type.toLowerCase();
-  const s = String(v);
-  if (t === "bit") return s === "1" || s.toLowerCase() === "true" ? "1" : "0";
-  if (NUMERIC.has(t)) {
-    if (s.trim() === "") return "NULL";
-    const n = Number(s.replace(/[$,]/g, ""));
-    return isNaN(n) ? "NULL" : String(n);
-  }
-  if (s.trim() === "") {
-    return t.includes("char") || t.includes("text") ? "N''" : "NULL";
-  }
-  return sqlStr(s);
-}
-
-function coerce(raw: string, type: string): unknown {
-  const t = type.toLowerCase();
-  if (raw === "") return t.includes("char") || t.includes("text") ? "" : null;
-  if (t === "bit") return raw === "1" || raw.toLowerCase() === "true";
-  if (NUMERIC.has(t)) {
-    const n = Number(raw.replace(/[$,]/g, ""));
-    return isNaN(n) ? raw : n;
-  }
-  return raw;
-}
-
-function whereClause(result: QueryResult, pk: string[], rowIdx: number): string | null {
+function whereClause(
+  d: Dialect,
+  result: QueryResult,
+  pk: string[],
+  rowIdx: number
+): string | null {
   const parts: string[] = [];
   for (const pkName of pk) {
     const ci = result.columns.findIndex(
@@ -562,7 +509,7 @@ function whereClause(result: QueryResult, pk: string[], rowIdx: number): string 
     );
     if (ci < 0) return null;
     const col = result.columns[ci];
-    parts.push(`${ident(col.name)} = ${sqlLiteral(result.rows[rowIdx][ci], col.type)}`);
+    parts.push(`${d.ident(col.name)} = ${d.literal(result.rows[rowIdx][ci], col.type)}`);
   }
   return parts.length ? parts.join(" AND ") : null;
 }

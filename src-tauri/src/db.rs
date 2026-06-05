@@ -933,6 +933,37 @@ mod tests {
         assert!(s.columns.iter().any(|c| c.name == "TABLE_NAME"));
         assert!(s.rows.iter().any(|r| r[1] == serde_json::json!("t")));
 
+        // Verify the SQLite-dialect introspection + edit SQL shapes (these mirror
+        // what src/lib/dialects.ts emits for the editable-results path).
+        exec(
+            &mut conn,
+            "CREATE TABLE t2 (id INTEGER PRIMARY KEY, base INTEGER, \
+             doubled INTEGER GENERATED ALWAYS AS (base * 2))",
+            None,
+        )
+        .await
+        .expect("create t2");
+        // PK detection via pragma_table_info
+        let pk = exec(&mut conn, "SELECT name FROM pragma_table_info('t2') WHERE pk > 0 ORDER BY pk", None)
+            .await
+            .expect("pk");
+        assert_eq!(pk.rows.len(), 1);
+        assert_eq!(pk.rows[0][0], serde_json::json!("id"));
+        // Generated-column (read-only) detection via pragma_table_xinfo
+        let ro = exec(&mut conn, "SELECT name FROM pragma_table_xinfo('t2') WHERE hidden IN (2, 3)", None)
+            .await
+            .expect("readonly");
+        assert!(ro.rows.iter().any(|r| r[0] == serde_json::json!("doubled")));
+        // INSERT / UPDATE / DELETE with double-quoted identifiers
+        exec(&mut conn, "INSERT INTO \"t2\" (\"id\", \"base\") VALUES (1, 10)", None).await.expect("ins");
+        exec(&mut conn, "UPDATE \"t2\" SET \"base\" = 20 WHERE \"id\" = 1", None).await.expect("upd");
+        let chk = exec(&mut conn, "SELECT base, doubled FROM t2 WHERE id = 1", None).await.expect("chk");
+        assert_eq!(chk.rows[0][0], serde_json::json!(20));
+        assert_eq!(chk.rows[0][1], serde_json::json!(40)); // generated recomputed
+        exec(&mut conn, "DELETE FROM \"t2\" WHERE \"id\" = 1", None).await.expect("del");
+        let after = exec(&mut conn, "SELECT COUNT(*) AS c FROM t2", None).await.expect("count");
+        assert_eq!(after.rows[0][0], serde_json::json!(0));
+
         drop(conn);
         let _ = std::fs::remove_file(&path);
     }
