@@ -22,7 +22,10 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use sqlx::mysql::{MySqlConnectOptions, MySqlConnection, MySqlSslMode};
 use sqlx::postgres::{PgConnectOptions, PgConnection, PgSslMode};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection};
-use sqlx::{Column as _, ConnectOptions, Row as _, TypeInfo as _, ValueRef as _};
+use sqlx::{
+    Column as _, ConnectOptions, Executor as _, Row as _, SqlSafeStr as _, Statement as _,
+    TypeInfo as _, ValueRef as _,
+};
 
 type SqlClient = Client<Compat<TcpStream>>;
 
@@ -244,6 +247,26 @@ async fn exec_mssql(
     Ok(finish(columns, rows, start))
 }
 
+// When a sqlx query returns zero rows we can't read column metadata from a row,
+// so fall back to `prepare` (plans the statement without executing it — safe for
+// INSERT/UPDATE) to still surface column headers for empty result sets.
+macro_rules! describe_columns_fallback {
+    ($conn:expr, $sql:expr, $columns:expr) => {
+        if $columns.is_empty() {
+            if let Ok(stmt) = (&mut *$conn).prepare(sqlx::AssertSqlSafe($sql).into_sql_str()).await {
+                $columns = stmt
+                    .columns()
+                    .iter()
+                    .map(|c| Column {
+                        name: c.name().to_string(),
+                        type_name: c.type_info().name().to_lowercase(),
+                    })
+                    .collect();
+            }
+        }
+    };
+}
+
 async fn exec_postgres(
     conn: &mut PgConnection,
     sql: &str,
@@ -283,6 +306,7 @@ async fn exec_postgres(
         rows.push(vals);
     }
 
+    describe_columns_fallback!(conn, sql, columns);
     Ok(finish(columns, rows, start))
 }
 
@@ -321,6 +345,7 @@ async fn exec_mysql(
         rows.push(vals);
     }
 
+    describe_columns_fallback!(conn, sql, columns);
     Ok(finish(columns, rows, start))
 }
 
@@ -359,6 +384,7 @@ async fn exec_sqlite(
         rows.push(vals);
     }
 
+    describe_columns_fallback!(conn, sql, columns);
     Ok(finish(columns, rows, start))
 }
 
@@ -829,6 +855,11 @@ mod tests {
         assert_eq!(row[8], serde_json::json!(9000000000_i64));
         assert_eq!(row[9], serde_json::json!(2));
 
+        // Empty result set must still report column headers (via prepare).
+        let empty = exec(&mut conn, "SELECT 1 AS a, 'x'::text AS b WHERE false", None).await.expect("empty");
+        assert_eq!(empty.row_count, 0);
+        assert_eq!(empty.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), vec!["a", "b"]);
+
         // And the schema-introspection query must run without error.
         let s = exec(&mut conn, schema_sql(Engine::Postgres), None).await.expect("schema");
         assert!(s.columns.iter().any(|c| c.name == "TABLE_NAME"));
@@ -887,6 +918,11 @@ mod tests {
         assert_eq!(row[6], serde_json::json!(9000000000_i64));
         assert_eq!(row[7], serde_json::json!(2));
 
+        // Empty result set must still report column headers (via prepare).
+        let empty = exec(&mut conn, "SELECT 1 AS a, 'x' AS b FROM DUAL WHERE 1 = 0", None).await.expect("empty");
+        assert_eq!(empty.row_count, 0);
+        assert_eq!(empty.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), vec!["a", "b"]);
+
         let s = exec(&mut conn, schema_sql(Engine::Mysql), None).await.expect("schema");
         assert!(s.columns.iter().any(|c| c.name == "TABLE_NAME"));
 
@@ -928,6 +964,11 @@ mod tests {
         assert_eq!(row[2], serde_json::json!("hi")); // TEXT
         assert_eq!(row[3], Value::Null); // NULL
         assert_eq!(row[4], serde_json::json!("0x00ff")); // BLOB
+
+        // Empty result set must still report column headers (via describe).
+        let empty = exec(&mut conn, "SELECT i, s FROM t WHERE 1 = 0", None).await.expect("empty");
+        assert_eq!(empty.row_count, 0);
+        assert_eq!(empty.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), vec!["i", "s"]);
 
         let s = exec(&mut conn, schema_sql(Engine::Sqlite), None).await.expect("schema");
         assert!(s.columns.iter().any(|c| c.name == "TABLE_NAME"));

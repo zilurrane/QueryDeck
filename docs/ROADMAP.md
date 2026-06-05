@@ -59,7 +59,7 @@ engineering / release hardening surfaced after the first signed release.
 - **P2-11** Prod safe-mode (read-only guard, confirm on writes) + connection color coding
 - **P2-12** DB insights — table/index sizes, row counts dashboard
 - **P2-13** ✅ Auto-update (Tauri updater) — signed releases via GitHub Actions; silent startup check + manual check in Settings; verified end-to-end on v0.1.1
-- **P2-14** ✅ Multi-engine support — driver/dialect abstraction in `db.rs` (`AnyConn`); **SQL Server (`tiberius`) + PostgreSQL, MySQL/MariaDB, and SQLite (`sqlx`)** all shipped, each verified against a live database. PK-aware inline editing is dialect-aware across all four engines (see `src/lib/dialects.ts`). Follow-ups: column metadata for empty server result sets, multi-statement scripts
+- **P2-14** ✅ Multi-engine support — driver/dialect abstraction in `db.rs` (`AnyConn`); **SQL Server (`tiberius`) + PostgreSQL, MySQL/MariaDB, and SQLite (`sqlx`)** all shipped, each verified against a live database. PK-aware inline editing is dialect-aware across all four engines (see `src/lib/dialects.ts`). Empty result sets report column headers on every engine (via `prepare` on the `sqlx` engines). Follow-up: multi-statement scripts
 
 ---
 
