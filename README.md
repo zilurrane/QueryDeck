@@ -1,12 +1,13 @@
 # QueryDeck
 
-**QueryDeck is a fast, lightweight Microsoft SQL Server (MSSQL) desktop client** — a
-slim, modern alternative to SQL Server Management Studio (SSMS) and Azure Data Studio.
-Browse your schema, write T-SQL, and explore and edit your data, all in a lightweight
-native app.
+**QueryDeck is a fast, lightweight SQL client for Microsoft SQL Server and PostgreSQL** —
+a slim, modern alternative to SQL Server Management Studio (SSMS), Azure Data Studio, and
+pgAdmin. Browse your schema, write SQL, and explore and edit your data, all in a
+lightweight native app. (MySQL/MariaDB and SQLite are on the way.)
 
 Built with **Tauri 2 + React + TypeScript** and a small Rust core using
-[`tiberius`](https://github.com/prisma/tiberius) for SQL Server connectivity.
+[`tiberius`](https://github.com/prisma/tiberius) for SQL Server and
+[`sqlx`](https://github.com/launchbadge/sqlx) for PostgreSQL.
 
 > Windows-first. ~10 MB installer (uses the OS WebView2 runtime — no bundled Chromium).
 
@@ -138,10 +139,10 @@ SQL Server types.
 ## FAQ
 
 **What is QueryDeck?**
-QueryDeck is a fast, lightweight desktop client for Microsoft SQL Server (MSSQL). It
-lets you connect to a SQL Server instance, browse its schema, write and run T-SQL, and
-view and edit results — in a small native app built with Tauri, React, and the Rust
-`tiberius` driver.
+QueryDeck is a fast, lightweight desktop SQL client for Microsoft SQL Server and
+PostgreSQL. It lets you connect to a database, browse its schema, write and run SQL, and
+view and edit results — in a small native app built with Tauri, React, and a Rust core
+(`tiberius` for SQL Server, `sqlx` for PostgreSQL).
 
 **Is QueryDeck free?**
 Yes. QueryDeck is free and open source under the [MIT license](LICENSE).
