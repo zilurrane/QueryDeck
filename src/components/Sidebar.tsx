@@ -52,13 +52,24 @@ export function Sidebar() {
     `${t.schema}.${t.name}`.toLowerCase().includes(filter.toLowerCase())
   );
 
+  // Dialect-aware identifier quoting: [x] for T-SQL, "x" for PostgreSQL.
+  const quoteId = (s: string) =>
+    conn?.engine === "postgres"
+      ? `"${s.replace(/"/g, '""')}"`
+      : `[${s.replace(/]/g, "]]")}]`;
+  const qualified = (t: Table) => `${quoteId(t.schema)}.${quoteId(t.name)}`;
+
   const peek = (t: Table) => {
-    loadIntoEditor(`SELECT TOP 100 *\nFROM [${t.schema}].[${t.name}];`);
+    loadIntoEditor(
+      conn?.engine === "postgres"
+        ? `SELECT *\nFROM ${qualified(t)}\nLIMIT 100;`
+        : `SELECT TOP 100 *\nFROM ${qualified(t)};`
+    );
     run();
   };
   const scriptSelect = (t: Table) => {
-    const cols = t.columns.map((c) => `    [${c.name}]`).join(",\n");
-    loadIntoEditor(`SELECT\n${cols}\nFROM [${t.schema}].[${t.name}];`);
+    const cols = t.columns.map((c) => `    ${quoteId(c.name)}`).join(",\n");
+    loadIntoEditor(`SELECT\n${cols}\nFROM ${qualified(t)};`);
     setCtx(null);
   };
 

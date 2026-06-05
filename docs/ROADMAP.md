@@ -59,6 +59,7 @@ engineering / release hardening surfaced after the first signed release.
 - **P2-11** Prod safe-mode (read-only guard, confirm on writes) + connection color coding
 - **P2-12** DB insights — table/index sizes, row counts dashboard
 - **P2-13** ✅ Auto-update (Tauri updater) — signed releases via GitHub Actions; silent startup check + manual check in Settings; verified end-to-end on v0.1.1
+- **P2-14** 🟡 Multi-engine support — driver/dialect abstraction in `db.rs` (`AnyConn`); **PostgreSQL pilot shipped** via `sqlx` alongside `tiberius`. Next: **MySQL/MariaDB** and **SQLite** (same `sqlx` crate). Follow-ups: dialect-aware inline editing (currently MSSQL-only), column metadata for empty Postgres result sets, multi-statement scripts
 
 ---
 

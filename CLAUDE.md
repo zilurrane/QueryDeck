@@ -4,9 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-QueryDeck is a desktop **Microsoft SQL Server (MSSQL)** client built with **Tauri 2** —
-a React/TypeScript frontend (`src/`) over a small Rust backend (`src-tauri/`) that talks
-to SQL Server via the `tiberius` driver. Windows-first; also builds for macOS/Linux.
+QueryDeck is a desktop SQL client built with **Tauri 2** — a React/TypeScript frontend
+(`src/`) over a small Rust backend (`src-tauri/`). It connects to **SQL Server** via the
+`tiberius` driver and **PostgreSQL** via `sqlx` (MySQL/SQLite planned). Windows-first;
+also builds for macOS/Linux.
 
 ## Commands
 
@@ -40,8 +41,11 @@ both `db.rs` (producer) and `src/lib/types.ts` (consumer types) must move togeth
   command names/args are declared — keep it in sync with `db.rs` `#[tauri::command]` fns.
 
 - **Connection registry (`db.rs`):** `DbState` holds a map of connection id → live
-  tiberius client. `connect` opens and stores one; `run_query`/`list_schema`/`disconnect`
-  look it up by id. Secrets (passwords) are handled by the `secret_*` commands via the OS
+  connection. Each connection is an `AnyConn` enum (`Mssql(tiberius)` / `Postgres(sqlx)`);
+  `build_client`/`exec`/`list_schema`/`schema_sql` dispatch on `ConnConfig.engine`, and the
+  per-engine cell→JSON mappers funnel into the same `QueryResult`. To add an engine: a new
+  `Engine` variant, an `AnyConn` arm, a cell mapper, and a `schema_sql` case. `connect` opens
+  and stores one; `run_query`/`list_schema`/`disconnect` look it up by id. Secrets (passwords) are handled by the `secret_*` commands via the OS
   keychain (`keyring`), never returned to or stored by the frontend in plaintext.
 
 - **Single Zustand store (`src/lib/store.ts`)** is the orchestration hub: it holds nearly

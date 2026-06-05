@@ -239,6 +239,7 @@ export const useStore = create<AppState>((set, get) => ({
       const sc: SavedConnection = {
         id: uid(),
         name: meta.name,
+        engine: cfg.engine,
         host: cfg.host,
         port: cfg.port,
         username: cfg.username,
@@ -267,6 +268,7 @@ export const useStore = create<AppState>((set, get) => ({
       password = (await persist.secretGet(sc.id).catch(() => null)) ?? "";
     }
     const cfg: ConnConfig = {
+      engine: sc.engine ?? "mssql",
       host: sc.host,
       port: sc.port,
       username: sc.username,
@@ -363,6 +365,12 @@ export const useStore = create<AppState>((set, get) => ({
   editTable: async (schema, table) => {
     const { conn } = get();
     if (!conn) return;
+    // Inline editing generates T-SQL (TOP, [brackets], sys.columns); other
+    // engines aren't supported yet — surface a clear message instead of failing.
+    if (conn.engine !== "mssql") {
+      set({ error: "Inline table editing is currently available for SQL Server only." });
+      return;
+    }
     set({ running: true, error: null });
     try {
       const pkRes = await api.runQuery(conn.id, pkSql(schema, table), null);

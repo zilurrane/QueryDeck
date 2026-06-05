@@ -1,12 +1,12 @@
 import { useMemo } from "react";
 import CodeMirror from "@uiw/react-codemirror";
-import { sql, MSSQL } from "@codemirror/lang-sql";
+import { sql, MSSQL, PostgreSQL } from "@codemirror/lang-sql";
 import { keymap } from "@codemirror/view";
 import { Prec } from "@codemirror/state";
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { githubLight } from "@uiw/codemirror-theme-github";
 import { useStore } from "../lib/store";
-import { THEMES } from "../lib/types";
+import { THEMES, engineDef } from "../lib/types";
 
 export function Editor() {
   const tab = useStore((s) => s.activeTab());
@@ -25,6 +25,8 @@ export function Editor() {
   };
 
   const dark = THEMES.find((t) => t.id === settings.themeId)?.dark ?? true;
+  const dialect = conn?.engine === "postgres" ? PostgreSQL : MSSQL;
+  const dialectName = engineDef(conn?.engine).dialect;
 
   const runKey = useMemo(
     () =>
@@ -58,8 +60,8 @@ export function Editor() {
           ★ Save
         </button>
         <div className="tb-right">
-          {settings.rowLimitEnabled && <span title="Row limit">TOP {settings.rowLimit}</span>}
-          <span>T-SQL · {conn ? conn.database : "no connection"}</span>
+          {settings.rowLimitEnabled && <span title="Row limit">≤ {settings.rowLimit} rows</span>}
+          <span>{dialectName} · {conn ? conn.database : "no connection"}</span>
         </div>
       </div>
       <div className="cm-host" style={{ fontSize: settings.fontSize }}>
@@ -67,10 +69,10 @@ export function Editor() {
           value={tab.sql}
           theme={dark ? vscodeDark : githubLight}
           height="100%"
-          extensions={[sql({ dialect: MSSQL }), runKey]}
+          extensions={[sql({ dialect }), runKey]}
           onChange={(v) => setSql(tab.id, v)}
           basicSetup={{ lineNumbers: true, foldGutter: false }}
-          placeholder="Write T-SQL here…  (Ctrl+Enter to run)"
+          placeholder={`Write ${dialectName} here…  (Ctrl+Enter to run)`}
         />
       </div>
     </div>

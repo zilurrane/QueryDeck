@@ -1,6 +1,27 @@
 // Mirrors the Rust structs in src-tauri/src/db.rs (snake_case nested fields).
 
+// Supported database engines (matches the Rust `Engine` enum, lowercase).
+export type Engine = "mssql" | "postgres";
+
+export interface EngineDef {
+  id: Engine;
+  name: string; // human label, e.g. "SQL Server"
+  dialect: string; // SQL dialect label, e.g. "T-SQL"
+  defaultPort: number;
+  defaultUser: string;
+  defaultDatabase: string;
+}
+
+export const ENGINES: EngineDef[] = [
+  { id: "mssql", name: "SQL Server", dialect: "T-SQL", defaultPort: 1433, defaultUser: "sa", defaultDatabase: "master" },
+  { id: "postgres", name: "PostgreSQL", dialect: "PostgreSQL", defaultPort: 5432, defaultUser: "postgres", defaultDatabase: "postgres" },
+];
+
+export const engineDef = (id: Engine | undefined): EngineDef =>
+  ENGINES.find((e) => e.id === id) ?? ENGINES[0];
+
 export interface ConnConfig {
+  engine: Engine;
   host: string;
   port: number;
   username: string;
@@ -13,6 +34,7 @@ export interface ConnConfig {
 export interface ConnInfo {
   id: string;
   database: string;
+  engine: Engine;
 }
 
 export interface Column {
@@ -48,6 +70,7 @@ export type Env = "prod" | "staging" | "dev";
 export interface SavedConnection {
   id: string;
   name: string;
+  engine: Engine;
   host: string;
   port: number;
   username: string;

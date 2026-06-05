@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useStore } from "../lib/store";
 import * as api from "../lib/api";
-import type { ConnConfig, Env } from "../lib/types";
+import { ENGINES, engineDef, type ConnConfig, type Engine, type Env } from "../lib/types";
 
 export function ConnectionModal() {
   const setModalOpen = useStore((s) => s.setModalOpen);
   const doConnect = useStore((s) => s.doConnect);
 
   const [cfg, setCfg] = useState<ConnConfig>({
+    engine: "mssql",
     host: "localhost",
     port: 1433,
     username: "sa",
@@ -17,6 +18,13 @@ export function ConnectionModal() {
     trust_cert: true,
   });
   const [name, setName] = useState("Local SQL Server");
+
+  // Switching engine swaps in that engine's conventional port/user/database.
+  const setEngine = (engine: Engine) => {
+    const d = engineDef(engine);
+    setCfg((c) => ({ ...c, engine, port: d.defaultPort, username: d.defaultUser, database: d.defaultDatabase }));
+    setName(`Local ${d.name}`);
+  };
   const [env, setEnv] = useState<Env>("dev");
   const [save, setSave] = useState(true);
   const [savePassword, setSavePassword] = useState(true);
@@ -52,9 +60,21 @@ export function ConnectionModal() {
   return (
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && setModalOpen(false)}>
       <div className="modal">
-        <h3>🔌 New SQL Server connection</h3>
+        <h3>🔌 New {engineDef(cfg.engine).name} connection</h3>
         <div className="form">
-          <div className="field full">
+          <div className="field">
+            <label>Database engine</label>
+            <select
+              className="select"
+              value={cfg.engine}
+              onChange={(e) => setEngine(e.target.value as Engine)}
+            >
+              {ENGINES.map((en) => (
+                <option key={en.id} value={en.id}>{en.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
             <label>Connection name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} />
           </div>
