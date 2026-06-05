@@ -1,7 +1,7 @@
 {
   "name": "querydeck",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A fast, lightweight desktop SQL client for Microsoft SQL Server, PostgreSQL, MySQL, and SQLite — a slim, modern alternative to SSMS, Azure Data Studio, pgAdmin, and MySQL Workbench. Built with Tauri, React, and a Rust core (tiberius + sqlx).",
   "keywords": [
     "sql-client",

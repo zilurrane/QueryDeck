@@ -1,6 +1,6 @@
 [package]
 name = "querydeck"
-version = "0.2.0"
+version = "0.2.1"
 description = "A fast, lightweight desktop SQL client for Microsoft SQL Server, PostgreSQL, MySQL, and SQLite — a slim alternative to SSMS / Azure Data Studio / pgAdmin / MySQL Workbench."
 authors = ["Zilu Ramkrishna Rane <zilurrane@gmail.com>"]
 license = "MIT"
